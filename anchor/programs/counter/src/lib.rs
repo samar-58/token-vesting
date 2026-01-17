@@ -1,7 +1,9 @@
 #![allow(clippy::result_large_err)]
 
+use std::ops::Not;
+
 use anchor_lang::prelude::*;
-use anchor_spl::{associated_token::AssociatedToken, token_interface::{Mint, TokenAccount, TokenInterface}};
+use anchor_spl::{associated_token::AssociatedToken, token_interface::{Mint, TokenAccount, TokenInterface, TransferChecked, transfer_checked},};
 
 declare_id!("Count3AcZucFDPSFBAeHkQ6AvttieKUkyJ8HiQGhQwe");
 
@@ -49,6 +51,62 @@ pub mod token_vesting {
     }
 
 pub fn claim_tokens(ctx: Context<ClaimTokens>, company_name: String)->Result<()>{
+let employee_account = &mut ctx.accounts.employee_account;
+
+let now = Clock::get()?.unix_timestamp;
+if now < employee_account.cliff_time {
+    return Err(ErrorCode::CliffNotReached.into());
+}
+
+let time_since_start = now.saturating_sub(employee_account.start_time);
+let vesting_duration = employee_account.end_time.saturating_sub(employee_account.start_time);
+
+
+if vesting_duration == 0 {
+    return Err(ErrorCode::CalculationOverflow.into());
+}
+
+let vested_amount = if now >= employee_account.end_time {
+    employee_account.total_amount
+} else {
+   match employee_account.total_amount.checked_mul(time_since_start as u64){
+    Some(amount) => amount / vesting_duration as u64,
+    None => {
+        return Err(ErrorCode::CalculationOverflow.into());
+    },
+   }
+};
+
+let claimable_amount = vested_amount.saturating_sub(employee_account.total_amount);
+
+if claimable_amount == 0 {
+return Err(ErrorCode::NothingToClaim.into())
+}
+
+
+
+let transfer_cpi_accounts = TransferChecked{
+from: ctx.accounts.treasury_token_account.to_account_info(),
+to: ctx.accounts.employee_token_account.to_account_info(),
+authority: ctx.accounts.vesting_account.to_account_info(),
+mint: ctx.accounts.mint.to_account_info(),
+};
+
+let treasury_account_seeds: &[&[u8]] = &[
+    b"treasury".as_ref(),
+    ctx.accounts.vesting_account.company_name.as_ref(),
+    &[ctx.accounts.vesting_account.treasury_bump],
+];
+let signer_seeds:&[&[&[u8]]] = &[&treasury_account_seeds[..]];
+let transfer_cpi_context = CpiContext::new_with_signer(
+    ctx.accounts.token_program.to_account_info(),
+    transfer_cpi_accounts,
+    signer_seeds,
+);
+
+transfer_checked(transfer_cpi_context, claimable_amount, ctx.accounts.mint.decimals)?;
+
+employee_account.released_amount += claimable_amount;
     Ok(())
 }
 
@@ -166,4 +224,16 @@ pub start_time: i64,
 pub cliff_time: i64,
 pub end_time: i64,
 pub bump: u8,
+}
+
+#[error_code]
+pub enum ErrorCode {
+    #[msg("Cliff period has not been reached yet.")]
+    CliffNotReached,
+    #[msg("Nothing to claim at this time.")]
+    InvalidVestingPeriod,
+    #[msg("Calculation overflow occurred.")]
+    CalculationOverflow,
+    #[msg("Nothing to claim at this time.")]
+    NothingToClaim,
 }
