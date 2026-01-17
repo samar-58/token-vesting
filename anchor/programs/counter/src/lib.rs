@@ -1,7 +1,7 @@
 #![allow(clippy::result_large_err)]
 
 use anchor_lang::prelude::*;
-use anchor_spl::token_interface::{Mint, TokenInterface};
+use anchor_spl::{associated_token::AssociatedToken, token_interface::{Mint, TokenAccount, TokenInterface}};
 
 declare_id!("Count3AcZucFDPSFBAeHkQ6AvttieKUkyJ8HiQGhQwe");
 
@@ -47,6 +47,11 @@ pub mod token_vesting {
         );
         Ok(())
     }
+
+pub fn claim_tokens(ctx: Context<ClaimTokens>, company_name: String)->Result<()>{
+    Ok(())
+}
+
 }
 
 
@@ -61,7 +66,7 @@ pub struct CreateVestingAccount<'info> {
      bump
     )]
     pub vesting_account: Account<'info, VestingAccount>,
-    mint: Account<'info, Mint>,
+    mint: InterfaceAccount<'info, Mint>,
 
     #[account(
      init,
@@ -84,7 +89,7 @@ pub struct InitializeEmployeeAccount<'info> {
      init,
      payer = user,
      space = 8 + EmployeeAccount::INIT_SPACE,
-     seeds = [employee.key().as_ref(), vesting_account.key().as_ref()],
+     seeds = [b"employee_vesting", employee.key().as_ref(), vesting_account.key().as_ref()],
      bump
     )]
     pub employee_account: Account<'info, EmployeeAccount>,
@@ -94,6 +99,47 @@ pub struct InitializeEmployeeAccount<'info> {
     pub vesting_account: Account<'info, VestingAccount>,
     #[account(mut)]
     pub user: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(company_name: String)]
+pub struct ClaimTokens<'info> {
+    #[account(mut)]
+    pub beneficiary: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [b"employee_vesting", beneficiary.key().as_ref(), vesting_account.key().as_ref()],
+        bump = employee_account.bump,
+        has_one = beneficiary,
+        has_one = vesting_account,
+    )]
+    pub employee_account: Account<'info, EmployeeAccount>,
+    #[account(
+        mut,
+        seeds = [company_name.as_ref()],
+        bump = vesting_account.bump,
+        has_one = treasury_token_account,
+        has_one = mint,
+    )]
+    pub vesting_account: Account<'info, VestingAccount>,
+    #[account(
+        mut,
+        seeds = [b"treasury".as_ref(), vesting_account.company_name.as_ref()],
+        bump = vesting_account.treasury_bump,
+    )]
+    pub treasury_token_account: Account<'info, TokenAccount>,
+    #[account(
+        init_if_needed,
+        payer = beneficiary,
+        associated_token::mint = mint,
+        associated_token::authority = beneficiary,
+        associated_token::token_program = token_program,
+    )]
+    pub employee_token_account: InterfaceAccount<'info, TokenAccount>,
+    pub token_program: Interface<'info, TokenInterface>,
+    pub mint: InterfaceAccount<'info, Mint>,
+    pub associated_token_program: Program<'info,AssociatedToken>,
     pub system_program: Program<'info, System>,
 }
 
