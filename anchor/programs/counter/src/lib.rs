@@ -1,70 +1,123 @@
 #![allow(clippy::result_large_err)]
 
 use anchor_lang::prelude::*;
+use anchor_spl::token_interface::{Mint, TokenInterface};
 
 declare_id!("Count3AcZucFDPSFBAeHkQ6AvttieKUkyJ8HiQGhQwe");
 
 #[program]
-pub mod counter {
+pub mod token_vesting {
     use super::*;
 
-    pub fn close(_ctx: Context<CloseCounter>) -> Result<()> {
+    pub fn create_vesting_account(ctx : Context<CreateVestingAccount>, company_name: String
+    )->Result<()> {
+        let vesting_account = &mut ctx.accounts.vesting_account;
+        vesting_account.set_inner(
+            VestingAccount {
+                owner: ctx.accounts.user.key(),
+                mint: ctx.accounts.mint.key(),
+                treasury_token_account: ctx.accounts.treasury_token_account.key(),
+                company_name,
+                treasury_bump: ctx.bumps.treasury_token_account,
+                bump: ctx.bumps.vesting_account,
+            }
+        );
         Ok(())
     }
 
-    pub fn decrement(ctx: Context<Update>) -> Result<()> {
-        ctx.accounts.counter.count = ctx.accounts.counter.count.checked_sub(1).unwrap();
-        Ok(())
-    }
-
-    pub fn increment(ctx: Context<Update>) -> Result<()> {
-        ctx.accounts.counter.count = ctx.accounts.counter.count.checked_add(1).unwrap();
-        Ok(())
-    }
-
-    pub fn initialize(_ctx: Context<InitializeCounter>) -> Result<()> {
-        Ok(())
-    }
-
-    pub fn set(ctx: Context<Update>, value: u8) -> Result<()> {
-        ctx.accounts.counter.count = value.clone();
+    pub fn initialize_employee_account(
+        ctx: Context<InitializeEmployeeAccount>,
+        total_amount: u64,
+        start_time: i64,
+        cliff_time: i64,
+        end_time: i64,
+    ) -> Result<()> {
+        let employee_account = &mut ctx.accounts.employee_account;
+        employee_account.set_inner(
+            EmployeeAccount {
+                employee: ctx.accounts.employee_account.key(),
+                vesting_account: ctx.accounts.vesting_account.key(),
+                total_amount,
+                released_amount: 0,
+                start_time,
+                cliff_time,
+                end_time,
+                bump: ctx.bumps.employee_account,
+            }
+        );
         Ok(())
     }
 }
 
+
 #[derive(Accounts)]
-pub struct InitializeCounter<'info> {
-    #[account(mut)]
-    pub payer: Signer<'info>,
+#[instruction(company_name: String)]
+pub struct CreateVestingAccount<'info> {
+    #[account(
+     init,
+     payer = user,
+     space = 8 + VestingAccount::INIT_SPACE,
+     seeds = [company_name.as_ref()],
+     bump
+    )]
+    pub vesting_account: Account<'info, VestingAccount>,
+    mint: Account<'info, Mint>,
 
     #[account(
-  init,
-  space = 8 + Counter::INIT_SPACE,
-  payer = payer
+     init,
+     payer = user,
+     token::mint = mint,
+     token::authority = vesting_account,
+     seeds = [b"treasury".as_ref(), company_name.as_ref()],
+     bump
     )]
-    pub counter: Account<'info, Counter>,
+    pub treasury_token_account: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub user: Signer<'info>,
     pub system_program: Program<'info, System>,
+    pub token_program: Interface<'info, TokenInterface>,
 }
-#[derive(Accounts)]
-pub struct CloseCounter<'info> {
-    #[account(mut)]
-    pub payer: Signer<'info>,
 
+#[derive(Accounts)]
+pub struct InitializeEmployeeAccount<'info> {
     #[account(
-  mut,
-  close = payer, // close account and return lamports to payer
+     init,
+     payer = user,
+     space = 8 + EmployeeAccount::INIT_SPACE,
+     seeds = [employee.key().as_ref(), vesting_account.key().as_ref()],
+     bump
     )]
-    pub counter: Account<'info, Counter>,
-}
-
-#[derive(Accounts)]
-pub struct Update<'info> {
+    pub employee_account: Account<'info, EmployeeAccount>,
+    #[account(
+        has_one = owner
+    )]
+    pub vesting_account: Account<'info, VestingAccount>,
     #[account(mut)]
-    pub counter: Account<'info, Counter>,
+    pub user: Signer<'info>,
+    pub system_program: Program<'info, System>,
 }
 
 #[account]
 #[derive(InitSpace)]
-pub struct Counter {
-    count: u8,
+pub struct VestingAccount{
+pub owner: Pubkey,
+pub mint :Pubkey,
+pub treasury_token_account: Pubkey,
+#[max_len(50)]
+pub company_name : String,
+pub treasury_bump: u8,
+pub bump: u8,
+}
+
+#[account]
+#[derive(InitSpace)]
+pub struct EmployeeAccount{
+pub employee: Pubkey,
+pub vesting_account: Pubkey,
+pub total_amount: u64,
+pub released_amount: u64,
+pub start_time: i64,
+pub cliff_time: i64,
+pub end_time: i64,
+pub bump: u8,
 }
