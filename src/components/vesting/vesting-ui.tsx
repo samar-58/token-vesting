@@ -84,7 +84,8 @@ export function VestingCreate() {
 }
 
 export function VestingList() {
-  const { accounts, getProgramAccount } = useVestingProgram()
+  const { accounts, allEmployeeAccounts, getProgramAccount } = useVestingProgram()
+  const { publicKey } = useWallet()
 
   if (getProgramAccount.isLoading) {
     return (
@@ -110,7 +111,7 @@ export function VestingList() {
     )
   }
 
-  if (accounts.isLoading) {
+  if (accounts.isLoading || allEmployeeAccounts.isLoading) {
     return (
       <div className="flex justify-center py-12">
         <div className="animate-pulse flex flex-col items-center gap-2">
@@ -121,7 +122,39 @@ export function VestingList() {
     )
   }
 
-  if (!accounts.data?.length) {
+  // Filter accounts: show only if user is owner or a beneficiary of an employee account
+  const filteredAccounts = accounts.data?.filter((vestingAccount) => {
+    if (!publicKey) return false
+
+    // Check if user is the owner of this vesting account
+    const isOwner = vestingAccount.account.owner.toString() === publicKey.toString()
+    if (isOwner) return true
+
+    // Check if user is a beneficiary in any employee account linked to this vesting account
+    const isBeneficiary = allEmployeeAccounts.data?.some(
+      (emp) =>
+        emp.account.vestingAccount.toString() === vestingAccount.publicKey.toString() &&
+        emp.account.beneficiary.toString() === publicKey.toString()
+    )
+
+    return isBeneficiary
+  })
+
+  if (!publicKey) {
+    return (
+      <Card className="border-muted">
+        <CardContent className="py-12 text-center">
+          <Wallet className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
+          <h3 className="text-lg font-medium mb-1">Wallet not connected</h3>
+          <p className="text-muted-foreground text-sm">
+            Connect your wallet to view your vesting accounts.
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (!filteredAccounts?.length) {
     return (
       <Card className="border-muted">
         <CardContent className="py-12 text-center">
@@ -137,7 +170,7 @@ export function VestingList() {
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
-      {accounts.data.map((account) => (
+      {filteredAccounts.map((account) => (
         <VestingCard key={account.publicKey.toString()} account={account.publicKey} />
       ))}
     </div>
@@ -202,10 +235,16 @@ function VestingCard({ account }: { account: PublicKey }) {
 
   const handleCreateEmployee = () => {
     if (beneficiary) {
+      // Convert datetime-local to Unix timestamp (seconds)
+      const toUnix = (dateStr: string) => {
+        if (!dateStr) return 0
+        return Math.floor(new Date(dateStr).getTime() / 1000)
+      }
+
       initializeEmployeeAccount.mutateAsync({
-        start_time: new BN(startTime || "0"),
-        end_time: new BN(endTime || "0"),
-        cliff_time: new BN(cliffTime || "0"),
+        start_time: new BN(toUnix(startTime)),
+        end_time: new BN(toUnix(endTime)),
+        cliff_time: new BN(toUnix(cliffTime)),
         total_amount: new BN(totalAmount || "0"),
         beneficiary: beneficiary
       })
@@ -293,29 +332,29 @@ function VestingCard({ account }: { account: PublicKey }) {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs">Start Time (Unix)</Label>
+                <Label className="text-xs">Start Date</Label>
                 <Input
-                  placeholder="e.g. 1704067200"
+                  type="datetime-local"
                   value={startTime}
-                  onChange={e => setStartTime(e.target.value.replace(/\D/g, ''))}
+                  onChange={e => setStartTime(e.target.value)}
                   className="h-9 text-sm"
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs">End Time (Unix)</Label>
+                <Label className="text-xs">End Date</Label>
                 <Input
-                  placeholder="e.g. 1735689600"
+                  type="datetime-local"
                   value={endTime}
-                  onChange={e => setEndTime(e.target.value.replace(/\D/g, ''))}
+                  onChange={e => setEndTime(e.target.value)}
                   className="h-9 text-sm"
                 />
               </div>
               <div className="space-y-1.5 sm:col-span-2">
-                <Label className="text-xs">Cliff Time (Unix)</Label>
+                <Label className="text-xs">Cliff Date</Label>
                 <Input
-                  placeholder="e.g. 1711929600"
+                  type="datetime-local"
                   value={cliffTime}
-                  onChange={e => setCliffTime(e.target.value.replace(/\D/g, ''))}
+                  onChange={e => setCliffTime(e.target.value)}
                   className="h-9 text-sm"
                 />
               </div>
