@@ -11,16 +11,16 @@ import { TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import BN from 'bn.js'
 
 interface InitializeVestingArgs {
-  company_name : string,
+  company_name: string,
   mint: string
 }
 
 interface InitializeEmployeeArgs {
-  start_time : BN;
-  end_time : BN;
-  total_amount : BN;
-  cliff_time : BN;
-  beneficiary : string;
+  start_time: BN;
+  end_time: BN;
+  total_amount: BN;
+  cliff_time: BN;
+  beneficiary: string;
 
 }
 
@@ -44,13 +44,13 @@ export function useVestingProgram() {
 
   const initializeVestingAccount = useMutation<string, Error, InitializeVestingArgs>({
     mutationKey: ['vesting_account', 'initialize_vesting', { cluster }],
-    mutationFn: ({company_name, mint}) =>
-    program.methods.initializeVestingAccount(company_name)
-    .accounts({
-      mint: new PublicKey(mint),
-      tokenProgram: TOKEN_PROGRAM_ID,
-    })
-    .rpc(),
+    mutationFn: ({ company_name, mint }) =>
+      program.methods.initializeVestingAccount(company_name)
+        .accounts({
+          mint: new PublicKey(mint),
+          tokenProgram: TOKEN_PROGRAM_ID,
+        })
+        .rpc(),
     onSuccess: async (signature) => {
       transactionToast(signature)
       await accounts.refetch()
@@ -79,22 +79,23 @@ export function useVestingProgramAccount({ account }: { account: PublicKey }) {
     queryFn: () => program.account.vestingAccount.fetch(account),
   })
 
-const initializeEmployeeAccount = useMutation<string, Error, InitializeEmployeeArgs>({
+  const initializeEmployeeAccount = useMutation<string, Error, InitializeEmployeeArgs>({
     mutationKey: ['employeeAccount', 'create', { cluster }],
-    mutationFn: ({start_time, end_time, cliff_time, total_amount, beneficiary}) =>
-    program.methods
-    .initializeEmployeeAccount(start_time, end_time, cliff_time, total_amount)
-    .accounts({
-      beneficiary: new PublicKey(beneficiary),
-      vestingAccount: account,
-    })
-    .rpc(),
+    mutationFn: ({ start_time, end_time, cliff_time, total_amount, beneficiary }) =>
+      program.methods
+        .initializeEmployeeAccount(start_time, end_time, cliff_time, total_amount)
+        .accounts({
+          beneficiary: new PublicKey(beneficiary),
+          vestingAccount: account,
+        })
+        .rpc(),
     onSuccess: async (signature) => {
       transactionToast(signature)
       await accounts.refetch()
     },
-    onError: () => {
-      toast.error('Failed to initialize vesting account')
+    onError: (error) => {
+      console.error('Failed to initialize employee account:', error)
+      toast.error(`Failed to initialize employee account: ${error.message}`)
     },
   })
 

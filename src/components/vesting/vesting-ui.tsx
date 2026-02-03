@@ -85,7 +85,7 @@ export function VestingList() {
 }
 
 function VestingCard({ account }: { account: PublicKey }) {
-  const { accountQuery, initializeEmployeeAccount } = useVestingProgramAccount({
+  const { accountQuery, initializeEmployeeAccount, } = useVestingProgramAccount({
     account,
   })
   const [startTme, setStartTime] = useState(new BN(0));
@@ -112,28 +112,28 @@ function VestingCard({ account }: { account: PublicKey }) {
             type="text"
             placeholder='start time'
             value={Number(startTme) || ''}
-            onChange={e => setStartTime(new BN(e.target.value))}
+            onChange={e => setStartTime(e.target.value && /^\d+$/.test(e.target.value) ? new BN(e.target.value) : new BN(0))}
             className='input input-bordered w-full max-w-xs'
           />
           <input
             type="text"
             placeholder='end time'
             value={Number(endTime) || ''}
-            onChange={e => setEndTime(new BN(e.target.value))}
+            onChange={e => setEndTime(e.target.value && /^\d+$/.test(e.target.value) ? new BN(e.target.value) : new BN(0))}
             className='input input-bordered w-full max-w-xs'
           />
           <input
             type="text"
             placeholder='total allocation'
             value={Number(total_amount) || ''}
-            onChange={e => setTotalAmount(new BN(e.target.value))}
+            onChange={e => setTotalAmount(e.target.value && /^\d+$/.test(e.target.value) ? new BN(e.target.value) : new BN(0))}
             className='input input-bordered w-full max-w-xs'
           />
           <input
             type="text"
             placeholder='cliff time'
             value={Number(cliffTime) || ''}
-            onChange={e => setCliffTime(new BN(e.target.value))}
+            onChange={e => setCliffTime(e.target.value && /^\d+$/.test(e.target.value) ? new BN(e.target.value) : new BN(0))}
             className='input input-bordered w-full max-w-xs'
           />
           <input
