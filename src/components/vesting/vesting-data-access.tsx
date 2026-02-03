@@ -37,6 +37,12 @@ export function useVestingProgram() {
     queryFn: () => program.account.vestingAccount.all(),
   })
 
+  // Fetch all employee accounts to check beneficiary status
+  const allEmployeeAccounts = useQuery({
+    queryKey: ['employee_accounts', 'all', { cluster }],
+    queryFn: () => program.account.employeeAccount.all(),
+  })
+
   const getProgramAccount = useQuery({
     queryKey: ['get-program-account', { cluster }],
     queryFn: () => connection.getParsedAccountInfo(programId),
@@ -64,6 +70,7 @@ export function useVestingProgram() {
     program,
     programId,
     accounts,
+    allEmployeeAccounts,
     getProgramAccount,
     initializeVestingAccount,
   }
