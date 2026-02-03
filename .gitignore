@@ -35,6 +35,7 @@ dist-ssr
 /anchor/target/sbf-solana-solana
 /anchor/target/test-ledger
 /anchor/target/.rustc_info.json
-/anchor/target
+/anchor/target/flycheck0
+/anchor/target/sbpf-solana-solana
 test-ledger
 **/*.rs.bk
