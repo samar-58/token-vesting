@@ -99,6 +99,7 @@ export function useVestingProgramAccount({ account }: { account: PublicKey }) {
         .accounts({
           beneficiary: new PublicKey(beneficiary),
           vestingAccount: account,
+          tokenProgram: TOKEN_PROGRAM_ID,
         })
         .rpc(),
     onSuccess: async (signature) => {
