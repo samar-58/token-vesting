@@ -5,8 +5,8 @@ use anchor_lang::prelude::*;
 pub struct EmployeeAccount {
     pub beneficiary: Pubkey,
     pub vesting_account: Pubkey,
-    pub total_allocated: i64,
-    pub total_claimed: i64,
+    pub total_allocated: u64,
+    pub total_claimed: u64,
     pub start_time: i64,
     pub end_time: i64,
     pub cliff_time: i64,

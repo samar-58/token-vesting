@@ -57,7 +57,7 @@ let total_vesting_duration = employee_account.end_time.saturating_sub(employee_a
 let vesting_amount = if now >= employee_account.end_time {
     employee_account.total_allocated
 } else {
-   (employee_account.total_allocated * time_since_start) / total_vesting_duration
+   (employee_account.total_allocated * time_since_start as u64) / total_vesting_duration as u64
 };
 
 let claimable_amount = vesting_amount.saturating_sub(employee_account.total_claimed);
@@ -86,7 +86,7 @@ let cpi_context = CpiContext::new_with_signer(
     vesting_signer_seeds,
 );
 
-transfer_checked(cpi_context, claimable_amount as u64, self.mint.decimals)?;
+transfer_checked(cpi_context, claimable_amount, self.mint.decimals)?;
 
 employee_account.total_claimed += claimable_amount;
 

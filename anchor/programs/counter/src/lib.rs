@@ -21,7 +21,7 @@ pub mod token {
         ctx : Context<InitializeEmployeeAccount>,
         start_time: i64,
         end_time: i64,
-        total_amount: i64,
+        total_amount: u64,
         cliff_time: i64
     )->Result<()>{
         instructions::initialize_employee::handler(ctx, total_amount, start_time, end_time, cliff_time)?;
