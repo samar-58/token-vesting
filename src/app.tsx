@@ -7,12 +7,12 @@ const links = [
   //
   { label: 'Home', path: '/' },
   { label: 'Account', path: '/account' },
-  { label: 'Counter Program', path: '/counter' },
+  { label: 'Vesting Program', path: '/vesting' },
 ]
 
 const LazyAccountIndex = lazy(() => import('@/components/account/account-index-feature'))
 const LazyAccountDetail = lazy(() => import('@/components/account/account-detail-feature'))
-const LazyCounter = lazy(() => import('@/components/counter/counter-feature'))
+const LazyVesting = lazy(() => import('@/components/vesting/vesting-feature'))
 const LazyDashboard = lazy(() => import('@/components/dashboard/dashboard-feature'))
 
 const routes: RouteObject[] = [
@@ -24,7 +24,7 @@ const routes: RouteObject[] = [
       { path: ':address', element: <LazyAccountDetail /> },
     ],
   },
-  { path: 'counter', element: <LazyCounter /> },
+  { path: 'vesting', element: <LazyVesting /> },
 ]
 
 console.log({ links, routes })

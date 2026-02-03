@@ -4,7 +4,7 @@ pub mod instructions;
 use crate::instructions::*;
 use anchor_lang::prelude::*;
 
-declare_id!("89K5fa9yF9wm7PgSRsBRBS1xa7eEZmqkuHocyNKM8cUK");
+declare_id!("GdMXVH2h4ajyy3nce6NPraBofmx673oWoZCwF76kw4DP");
 
 #[program]
 pub mod token {

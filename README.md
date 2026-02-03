@@ -125,7 +125,7 @@ pnpm format
 ```
 token-vesting/
 ├── anchor/                    # Smart contract (Rust + Anchor)
-│   ├── programs/counter/
+│   ├── programs/vesting/
 │   │   └── src/lib.rs        # Main vesting logic
 │   ├── Anchor.toml           # Anchor configuration
 │   └── Cargo.toml            # Rust dependencies

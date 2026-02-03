@@ -82,7 +82,7 @@ describe("sol-swap", () => {
   let payer: Keypair;
 
   beforeAll(() => {
-    const programPath = path.join(__dirname, "../target/deploy/sol_swap.so");
+    const programPath = path.join(__dirname, "../target/deploy/token.so");
     const programBytes = fs.readFileSync(programPath);
 
     svm = new LiteSVM()
@@ -96,5 +96,36 @@ describe("sol-swap", () => {
     payer = Keypair.generate();
 
     svm.airdrop(payer.publicKey, BigInt(10_000_000_000));
+  });
+
+  test("initialize vesting account", async () => {
+    const mint = createMint(svm, payer);
+    const treasuryAta = createAndFundAta(svm, payer, mint.publicKey, payer.publicKey, BigInt(1_000_000));
+
+    const companyName = "Test Company";
+    const vestingAccount = Keypair.generate();
+
+    const initializeVestingIx = new TransactionInstruction({
+      programId: PROGRAM_ID,
+      keys: [
+        { pubkey: vestingAccount.publicKey, isSigner: true, isWritable: true },
+        { pubkey: mint.publicKey, isSigner: false, isWritable: false },
+        { pubkey: treasuryAta, isSigner: false, isWritable: true },
+        { pubkey: payer.publicKey, isSigner: true, isWritable: true },
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      ],
+      data: Buffer.concat([
+        Buffer.from([0]), // Instruction discriminator for initialize_vesting_account
+        encodeU64(new BN(companyName.length)),
+        Buffer.from(companyName, "utf-8"),
+      ]),
+    });
+
+    const tx = new Transaction().add(initializeVestingIx);
+    await sendTx(svm, tx, [payer, vestingAccount]);
+
+    const vestingAccData = svm.getAccount(vestingAccount.publicKey);
+    console.log("Vesting Account Data:", vestingAccData);
+    expect(vestingAccData).toBeDefined();
   });
 });
