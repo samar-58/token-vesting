@@ -79,11 +79,23 @@ export function useVestingProgramAccount({ account }: { account: PublicKey }) {
     queryFn: () => program.account.vestingAccount.fetch(account),
   })
 
+  // Fetch all employee accounts for this vesting account
+  const employeeAccounts = useQuery({
+    queryKey: ['employee_accounts', 'all', { cluster, vestingAccount: account.toString() }],
+    queryFn: async () => {
+      const allEmployees = await program.account.employeeAccount.all()
+      // Filter employees that belong to this vesting account
+      return allEmployees.filter(
+        (emp) => emp.account.vestingAccount.toString() === account.toString()
+      )
+    },
+  })
+
   const initializeEmployeeAccount = useMutation<string, Error, InitializeEmployeeArgs>({
     mutationKey: ['employeeAccount', 'create', { cluster }],
     mutationFn: ({ start_time, end_time, cliff_time, total_amount, beneficiary }) =>
       program.methods
-        .initializeEmployeeAccount(start_time, end_time, cliff_time, total_amount)
+        .initializeEmployeeAccount(start_time, end_time, total_amount, cliff_time)
         .accounts({
           beneficiary: new PublicKey(beneficiary),
           vestingAccount: account,
@@ -92,6 +104,7 @@ export function useVestingProgramAccount({ account }: { account: PublicKey }) {
     onSuccess: async (signature) => {
       transactionToast(signature)
       await accounts.refetch()
+      await employeeAccounts.refetch()
     },
     onError: (error) => {
       console.error('Failed to initialize employee account:', error)
@@ -99,8 +112,35 @@ export function useVestingProgramAccount({ account }: { account: PublicKey }) {
     },
   })
 
+  const claimTokens = useMutation<string, Error, { companyName: string }>({
+    mutationKey: ['employeeAccount', 'claim', { cluster }],
+    mutationFn: async ({ companyName }) => {
+      const vestingData = await program.account.vestingAccount.fetch(account)
+      return program.methods
+        .claimTokens(companyName)
+        .accountsPartial({
+          vestingAccount: account,
+          mint: vestingData.mint,
+          treasuryTokenAccount: vestingData.treasuryTokenAccount,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        })
+        .rpc()
+    },
+    onSuccess: async (signature) => {
+      transactionToast(signature)
+      await employeeAccounts.refetch()
+      toast.success('Tokens claimed successfully!')
+    },
+    onError: (error) => {
+      console.error('Failed to claim tokens:', error)
+      toast.error(`Failed to claim tokens: ${error.message}`)
+    },
+  })
+
   return {
     accountQuery,
+    employeeAccounts,
     initializeEmployeeAccount,
+    claimTokens,
   }
 }

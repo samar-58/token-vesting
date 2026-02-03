@@ -15,7 +15,7 @@ pub struct ClaimTokens<'info>{
         has_one = beneficiary,
         has_one = vesting_account,
     )]
-    pub employee_account : Account<'info, EmployeeAccount>,
+    pub employee_account : Box<Account<'info, EmployeeAccount>>,
 
     #[account(
         mut,
@@ -24,10 +24,10 @@ pub struct ClaimTokens<'info>{
         has_one = mint,
         has_one = treasury_token_account,
     )]
-    pub vesting_account : Account<'info, VestingAccount>,
-    pub mint : InterfaceAccount<'info, Mint>,
+    pub vesting_account : Box<Account<'info, VestingAccount>>,
+    pub mint : Box<InterfaceAccount<'info, Mint>>,
     #[account(mut)]
-    pub treasury_token_account : InterfaceAccount<'info, TokenAccount>,
+    pub treasury_token_account : Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
         init_if_needed,
         payer = beneficiary,
@@ -35,7 +35,7 @@ pub struct ClaimTokens<'info>{
         associated_token::authority = beneficiary,
         associated_token::token_program = token_program,
     )]
-    pub employee_token_account : InterfaceAccount<'info, TokenAccount>,
+    pub employee_token_account : Box<InterfaceAccount<'info, TokenAccount>>,
     pub token_program : Interface<'info, TokenInterface>,
     pub system_program : Program<'info, System>,
     pub associated_token_program : Program<'info,AssociatedToken>,
@@ -73,18 +73,17 @@ let transfer_cpi_accounts = TransferChecked{
     authority : self.vesting_account.to_account_info(),
 };
 
-let treasury_account_seeds:&[&[&[u8]]]= &[
+let vesting_signer_seeds:&[&[&[u8]]]= &[
     &[
-        b"treasury".as_ref(),
         self.vesting_account.company_name.as_ref(),
-        &[self.vesting_account.treasury_bump],
+        &[self.vesting_account.bump],
     ]
 ];
 
 let cpi_context = CpiContext::new_with_signer(
     self.token_program.to_account_info(),
     transfer_cpi_accounts,
-    treasury_account_seeds,
+    vesting_signer_seeds,
 );
 
 transfer_checked(cpi_context, claimable_amount as u64, self.mint.decimals)?;

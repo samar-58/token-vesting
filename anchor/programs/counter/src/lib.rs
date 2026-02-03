@@ -27,12 +27,13 @@ pub mod token {
         instructions::initialize_employee::handler(ctx, total_amount, start_time, end_time, cliff_time)?;
         Ok(())
     }
+    pub fn claim_tokens(ctx : Context<ClaimTokens>, company_name: String)->Result<()>{
+        instructions::claim_tokens::handler(ctx)?;
+        Ok(())
+    }
 }
 
-pub fn claim_tokens(ctx : Context<ClaimTokens>)->Result<()>{
-instructions::claim_tokens::handler(ctx)?;
-Ok(())
-}
+
 
 
 
