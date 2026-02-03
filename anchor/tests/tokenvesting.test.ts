@@ -8,13 +8,9 @@ import {
   createMintToInstruction,
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
-import BN from "bn.js";
+import * as BN from "bn.js";
 import * as path from "path";
-import { fileURLToPath } from "url";
-import fs from "fs";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import * as fs from "fs";
 
 const PROGRAM_ID = new PublicKey("BK8PFTkAGSWj41nndYVfpQY4rnWU5j6FFXX6tHkZUMEH");
 

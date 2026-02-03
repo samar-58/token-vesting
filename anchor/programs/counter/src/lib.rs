@@ -1,7 +1,8 @@
-use core::time;
-
+pub mod errors;
+pub mod states;
+pub mod instructions;
+use crate::instructions::*;
 use anchor_lang::prelude::*;
-use anchor_spl::{associated_token::AssociatedToken, token_interface::{Mint, TokenAccount, TokenInterface, TransferChecked, transfer_checked},};
 
 declare_id!("89K5fa9yF9wm7PgSRsBRBS1xa7eEZmqkuHocyNKM8cUK");
 
@@ -10,203 +11,31 @@ pub mod token {
     use super::*;
 
     pub fn initialize_vesting_account(ctx : Context<InitializeVestingAccount>, company_name: String)->Result<()> {
-*ctx.accounts.vesting_account = VestingAccount {
-            owner: ctx.accounts.signer.key(),
-            mint: ctx.accounts.mint.key(),
-            treasury_token_account: ctx.accounts.treasury_token_account.key(),
-            company_name,
-            treasury_bump: ctx.bumps.treasury_token_account,
-            bump: ctx.bumps.vesting_account,
-        };
-        Ok(())
+        let bump = ctx.bumps.vesting_account;
+        let treasury_bump = ctx.bumps.treasury_token_account;
+        instructions::initialize_vesting::handler(ctx, company_name, bump, treasury_bump)?;
+      Ok(())
     }
 
-    pub fn initialize_employee_account(ctx : Context<InitializeEmployeeAccount>,
-         start_time: i64,
+    pub fn initialize_employee_account(
+        ctx : Context<InitializeEmployeeAccount>,
+        start_time: i64,
         end_time: i64,
         total_amount: i64,
         cliff_time: i64
     )->Result<()>{
-        *ctx.accounts.employee_account = EmployeeAccount {
-            beneficiary: ctx.accounts.beneficiary.key(),
-            vesting_account: ctx.accounts.vesting_account.key(),
-            total_allocated: total_amount,
-            total_claimed: 0,
-            start_time: start_time,
-            end_time: end_time,
-            cliff_time: cliff_time,
-            bump: ctx.bumps.employee_account,
-        };
-Ok(())
+        instructions::initialize_employee::handler(ctx, total_amount, start_time, end_time, cliff_time)?;
+        Ok(())
     }
 }
 
 pub fn claim_tokens(ctx : Context<ClaimTokens>)->Result<()>{
-let employee_account = &mut ctx.accounts.employee_account;
-
-let now = Clock::get()?.unix_timestamp;
-if now < employee_account.cliff_time {
-    return Err(ErrorCode::CliffNotReached.into());
-}
-
-let time_since_start = now.saturating_sub(employee_account.start_time);
-let total_vesting_duration = employee_account.end_time.saturating_sub(employee_account.start_time);
-
-
-let vesting_amount = if now >= employee_account.end_time {
-    employee_account.total_allocated
-} else {
-   (employee_account.total_allocated * time_since_start) / total_vesting_duration
-};
-
-let claimable_amount = vesting_amount.saturating_sub(employee_account.total_claimed);
-
-    if claimable_amount == 0 {
-            return Err(ErrorCode::NothingToClaim.into());
-        }
-
-let transfer_cpi_accounts = TransferChecked{
-    from : ctx.accounts.treasury_token_account.to_account_info(),
-    mint : ctx.accounts.mint.to_account_info(),
-    to : ctx.accounts.employee_token_account.to_account_info(),
-    authority : ctx.accounts.vesting_account.to_account_info(),
-};
-
-let treasury_account_seeds:&[&[&[u8]]]= &[
-    &[
-        b"treasury".as_ref(),
-        ctx.accounts.vesting_account.company_name.as_ref(),
-        &[ctx.accounts.vesting_account.treasury_bump],
-    ]
-];
-
-let cpi_context = CpiContext::new_with_signer(
-    ctx.accounts.token_program.to_account_info(),
-    transfer_cpi_accounts,
-    treasury_account_seeds,
-);
-
-transfer_checked(cpi_context, claimable_amount as u64, ctx.accounts.mint.decimals)?;
-
-employee_account.total_claimed += claimable_amount;
-
+instructions::claim_tokens::handler(ctx)?;
 Ok(())
-
 }
 
 
-#[derive(Accounts)]
-#[instruction(company_name: String)]
-pub struct InitializeVestingAccount<'info> {
-    #[account(mut)]
-    pub signer : Signer<'info>,
-    #[account(
-        init,
-        payer = signer,
-        space = 8 + VestingAccount::INIT_SPACE,
-        seeds = [company_name.as_ref()],
-        bump,
-    )
-    ]
-    pub vesting_account: Account<'info, VestingAccount>,
-    pub mint : InterfaceAccount<'info, Mint>,
-    #[account(
-        init,
-        payer = signer,
-        token::mint = mint,
-        token::authority = vesting_account,
-        seeds = [b"treasury".as_ref(), company_name.as_ref()],
-        bump,
-    )]
-    pub treasury_token_account : InterfaceAccount<'info, TokenAccount>,
-    pub system_program : Program<'info, System>,
-    pub token_program : Interface<'info, TokenInterface>,
-}
-#[derive(Accounts)]
- pub struct InitializeEmployeeAccount<'info>{
-    #[account(mut)]
-    pub owner : Signer<'info>,
-    pub beneficiary : SystemAccount<'info>,
-    #[account(
-        init,
-        payer = owner,
-        space = 8 + EmployeeAccount::INIT_SPACE,
-        seeds = [b"employee_vesting".as_ref(), beneficiary.key().as_ref(), vesting_account.key().as_ref()],
-        bump,
-    )]
-    pub employee_account : Account<'info, EmployeeAccount>,
-    #[account(has_one = owner)]
-    pub vesting_account : Account<'info, VestingAccount>,
-    pub system_program : Program<'info, System>,
- }
 
-#[derive(Accounts)]
-#[instruction(company_name: String)]
-pub struct ClaimTokens<'info>{
-    #[account(mut)]
-    pub beneficiary : Signer<'info>,
-    #[account(
-        mut,
-        seeds = [b"employee_vesting".as_ref(), beneficiary.key().as_ref(), vesting_account.key().as_ref()],
-        bump,
-        has_one = beneficiary,
-        has_one = vesting_account,
-    )]
-    pub employee_account : Account<'info, EmployeeAccount>,
 
-    #[account(
-        mut,
-        seeds = [company_name.as_ref()],
-        bump = vesting_account.bump,
-        has_one = mint,
-        has_one = treasury_token_account,
-    )]
-    pub vesting_account : Account<'info, VestingAccount>,
-    pub mint : InterfaceAccount<'info, Mint>,
-    #[account(mut)]
-    pub treasury_token_account : InterfaceAccount<'info, TokenAccount>,
-    #[account(
-        init_if_needed,
-        payer = beneficiary,
-        associated_token::mint = mint,
-        associated_token::authority = beneficiary,
-        associated_token::token_program = token_program,
-    )]
-    pub employee_token_account : InterfaceAccount<'info, TokenAccount>,
-    pub token_program : Interface<'info, TokenInterface>,
-    pub system_program : Program<'info, System>,
-    pub associated_token_program : Program<'info,AssociatedToken>,
-}
 
-#[account]
-#[derive(InitSpace)]
-pub struct VestingAccount {
-    pub owner: Pubkey,
-    pub mint: Pubkey,
-    pub treasury_token_account: Pubkey,
-    #[max_len(64)]
-    pub company_name: String,
-    pub treasury_bump: u8,
-    pub bump: u8,
-}
 
-#[account]
-#[derive(InitSpace)]
-pub struct EmployeeAccount {
-    pub beneficiary: Pubkey,
-    pub vesting_account: Pubkey,
-    pub total_allocated: i64,
-    pub total_claimed: i64,
-    pub start_time: i64,
-    pub end_time: i64,
-    pub cliff_time: i64,
-    pub bump: u8,
-}
-
-#[error_code]
-pub enum ErrorCode {
-    #[msg("Cliff period not reached yet.")]
-    CliffNotReached,
-    #[msg("No tokens available to claim.")]
-    NothingToClaim,
-}
